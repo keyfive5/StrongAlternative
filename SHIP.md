@@ -181,13 +181,19 @@ node scripts/asc-submit.mjs
   saves on device (the browser build uses localStorage and cannot show it).
   `scripts/test-storage.mjs` runs the storage class against a fake filesystem
   with the same async, no-clobber move.
+- **Health & Fitness (and Medical) apps must declare whether they are a
+  regulated medical device** before review, or `POST /v1/reviewSubmissionItems`
+  409s with `CANNOT_SUBMIT_MISSING_REGULATED_MEDICAL_DEVICE_APP_DECLARATION`.
+  It is not in the public API: App Information → Regulated Medical Devices →
+  Declare → No → Save. Re-running `asc-submit.mjs` then reuses the open
+  submission.
 - The App Store Connect New App dialog: text fields take real clicks and
   typing; the two dropdowns need click, type the option text, then Return.
   Setting their value programmatically is ignored.
 
 ## This app
 
-- App Store Connect id **6818696263** (also in `.ascappid`)
+- App Store Connect id **6818696263** (also in `.ascappid`) — submitted for review 2 Oct 2026, release after approval
 - Bundle `com.hasanzafar.overload` (bundle id record 5TTGQ6J48P), SKU `OVERLOAD2026`
 - EAS project `2e944a56-169c-4a78-8d75-638dc90cac87`
 - Distribution certificate DNL88X8YD9, provisioning profile GPU763T4X9
