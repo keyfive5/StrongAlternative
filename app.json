@@ -13,7 +13,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#0B0C0E"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.hasanzafar.overload",
@@ -36,11 +38,20 @@
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
     },
-    "plugins": ["expo-sharing", "expo-document-picker"],
+    "plugins": [
+      "expo-sharing",
+      "expo-document-picker",
+      [
+        "expo-notifications",
+        {
+          "mode": "production"
+        }
+      ]
+    ],
     "owner": "keyfive",
     "extra": {
       "eas": {
-        "projectId": "00000000-0000-0000-0000-000000000000"
+        "projectId": "2e944a56-169c-4a78-8d75-638dc90cac87"
       }
     }
   }

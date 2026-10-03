@@ -66,10 +66,33 @@ async function ensureBundleId() {
   return created.data.id;
 }
 
+/**
+ * expo-notifications adds the aps-environment entitlement (it is one of the
+ * plugins Expo applies automatically once the package is installed), and a
+ * profile for a bundle id without the Push Notifications capability fails to
+ * sign it. The app only schedules local notifications — the rest timer — but
+ * the capability has to exist before the profile is made.
+ */
+async function ensurePushCapability(bundleIdId) {
+  const caps = await api('GET', `/v1/bundleIds/${bundleIdId}/bundleIdCapabilities`);
+  if ((caps.data || []).some((c) => c.attributes.capabilityType === 'PUSH_NOTIFICATIONS')) {
+    console.log('• push capability already enabled');
+    return;
+  }
+  await api('POST', '/v1/bundleIdCapabilities', {
+    data: {
+      type: 'bundleIdCapabilities',
+      attributes: { capabilityType: 'PUSH_NOTIFICATIONS' },
+      relationships: { bundleId: { data: { type: 'bundleIds', id: bundleIdId } } },
+    },
+  });
+  console.log('• push capability enabled');
+}
+
 async function createCertificate() {
   sh('openssl', ['genrsa', '-out', 'dist.key', '2048']);
   sh('openssl', ['req', '-new', '-key', 'dist.key', '-out', 'dist.csr',
-    '-subj', '/CN=QR Forge Distribution/O=Hasan Zafar/C=US']);
+    '-subj', '/CN=Overload Distribution/O=Hasan Zafar/C=US']);
   const csr = fs.readFileSync(path.join(CRED, 'dist.csr'), 'utf8');
 
   let created;
@@ -128,6 +151,7 @@ async function createProfile(bundleIdId, certId) {
 
 (async () => {
   const bundleIdId = await ensureBundleId();
+  await ensurePushCapability(bundleIdId);
   const certId = await createCertificate();
   await createProfile(bundleIdId, certId);
   fs.writeFileSync(path.join(ROOT, 'credentials.json'), JSON.stringify({

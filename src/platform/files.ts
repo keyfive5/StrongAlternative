@@ -5,7 +5,9 @@ import { Platform } from 'react-native';
 export async function pickTextFile(): Promise<{ name: string; text: string } | null> {
   const DocumentPicker = require('expo-document-picker') as typeof import('expo-document-picker');
   const res = await DocumentPicker.getDocumentAsync({
-    type: ['text/csv', 'text/comma-separated-values', 'application/json', 'text/plain', 'public.comma-separated-values-text', '*/*'],
+    // Any file: exports arrive as .csv, .txt or .json depending on the app and
+    // on how they were saved, and the content is checked after reading.
+    type: '*/*',
     copyToCacheDirectory: true,
     multiple: false,
   });

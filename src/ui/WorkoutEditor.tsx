@@ -2,16 +2,16 @@
 // editing a finished workout after the fact.
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { InputAccessoryView, Keyboard, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { e1rm, exerciseHistory, type Session } from '../core/analytics.ts';
-import { suggest, type Suggestion, type Target } from '../core/coach.ts';
+import { incrementKg, suggest, type Suggestion, type Target } from '../core/coach.ts';
 import { warmupRamp } from '../core/plates.ts';
 import type { Exercise, SetType, Unit, Workout, WorkoutExercise, WorkoutSet } from '../core/types.ts';
 import { uid } from '../core/types.ts';
-import { fmtEst, fmtNum, fmtWeight, fromDisplay, parseNum, toDisplay } from '../core/units.ts';
+import { fmtEst, fmtNum, fmtWeight, fromDisplay, parseNum, roundTo, toDisplay } from '../core/units.ts';
 import { newSet, startRest, useStore } from '../state/store.ts';
 import { Icon, type IconName } from './Icon.tsx';
-import { Button, Chip, Field, haptic, IconButton, Sheet, SheetScroll, T, toast } from './kit.tsx';
+import { afterModal, Button, Chip, Field, haptic, IconButton, Sheet, SheetScroll, T, toast } from './kit.tsx';
 import { useNav } from './nav.ts';
 import { ExercisePicker } from './pickers.tsx';
 import { PlateCalculator } from './tools.tsx';
@@ -21,6 +21,48 @@ type Change = (fn: (w: Workout) => Workout) => void;
 
 // ---------------------------------------------------------------------------
 // Number entry that keeps what you are typing ("62." is not yet a number).
+//
+// On iPhone the number pad has no Done key, so every set field shares one bar
+// above the keyboard: minus and plus step the focused field by the exercise's
+// load increment or by one rep, and Done puts the keyboard away.
+
+const BAR_ID = 'overload-number-bar';
+let nudgeFocused: ((dir: 1 | -1) => void) | null = null;
+let showSteppers: ((on: boolean) => void) | null = null;
+
+export function NumberBar() {
+  const c = useTheme();
+  const [steppers, setSteppers] = useState(false);
+  useEffect(() => {
+    showSteppers = setSteppers;
+    return () => {
+      showSteppers = null;
+    };
+  }, []);
+  if (Platform.OS !== 'ios') return null;
+  const key = (label: string, a11y: string, onPress: () => void, primary = false) => (
+    <Pressable
+      key={a11y}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={a11y}
+      style={({ pressed }) => [styles.barKey, { backgroundColor: primary ? c.accent : c.raised, opacity: pressed ? 0.6 : 1 }]}
+    >
+      <T v="bodyStrong" color={primary ? c.accentText : c.text}>
+        {label}
+      </T>
+    </Pressable>
+  );
+  return (
+    <InputAccessoryView nativeID={BAR_ID}>
+      <View style={[styles.bar, { backgroundColor: c.surfaceAlt, borderTopColor: c.border }]}>
+        {steppers ? [key('\u2212', 'Decrease', () => nudgeFocused?.(-1)), key('+', 'Increase', () => nudgeFocused?.(1))] : null}
+        <View style={{ flex: 1 }} />
+        {key('Done', 'Done', () => Keyboard.dismiss(), true)}
+      </View>
+    </InputAccessoryView>
+  );
+}
 
 function NumInput({
   value,
@@ -30,6 +72,7 @@ function NumInput({
   width,
   testID,
   clock,
+  step,
 }: {
   value: string;
   placeholder: string;
@@ -38,13 +81,26 @@ function NumInput({
   width?: number;
   testID?: string;
   clock?: boolean;
+  /** How far the keyboard bar's minus and plus move this field. */
+  step?: number;
 }) {
   const c = useTheme();
   const [text, setText] = useState(value);
   const focused = useRef(false);
+  const latest = useRef(text);
+  latest.current = text;
   useEffect(() => {
     if (!focused.current) setText(value);
   }, [value]);
+  const nudge = (dir: 1 | -1) => {
+    if (!step) return;
+    // An empty field steps from its placeholder: the target is the natural start.
+    const from = parseNum(latest.current) ?? parseNum(placeholder) ?? 0;
+    const next = fmtNum(Math.max(0, roundTo(from + dir * step, step < 1 ? 0.01 : step)));
+    setText(next);
+    onCommit(next);
+    haptic();
+  };
   return (
     <TextInput
       testID={testID}
@@ -52,12 +108,18 @@ function NumInput({
       placeholder={placeholder}
       placeholderTextColor={c.textFaint}
       keyboardType={clock ? 'numbers-and-punctuation' : 'decimal-pad'}
+      inputAccessoryViewID={BAR_ID}
       selectTextOnFocus
       returnKeyType="done"
-      onFocus={() => (focused.current = true)}
+      onFocus={() => {
+        focused.current = true;
+        nudgeFocused = nudge;
+        showSteppers?.(!!step);
+      }}
       onBlur={() => {
         focused.current = false;
-        onCommit(text);
+        if (nudgeFocused === nudge) nudgeFocused = null;
+        onCommit(latest.current);
       }}
       onChangeText={(t) => {
         setText(t);
@@ -93,15 +155,25 @@ function fmtClockShort(sec: number | undefined): string {
 // ---------------------------------------------------------------------------
 // Columns per exercise kind
 
+interface Column {
+  label: string;
+  get: (s: Partial<WorkoutSet>) => string;
+  set: (text: string) => Partial<WorkoutSet>;
+  clock?: boolean;
+  step?: number;
+}
+
 interface Columns {
-  a?: { label: string; get: (s: Partial<WorkoutSet>) => string; set: (text: string) => Partial<WorkoutSet>; clock?: boolean };
-  b: { label: string; get: (s: Partial<WorkoutSet>) => string; set: (text: string) => Partial<WorkoutSet>; clock?: boolean };
+  a?: Column;
+  b: Column;
   /** Whether a set has what it needs to be ticked off. */
   complete: (s: Partial<WorkoutSet>) => boolean;
   fmt: (s: Partial<WorkoutSet>) => string;
 }
 
 function columns(ex: Exercise, unit: Unit): Columns {
+  // The keyboard bar steps load by this exercise's progression increment.
+  const loadStep = roundTo(toDisplay(incrementKg(ex, unit), unit), unit === 'kg' ? 0.25 : 0.5) || 1;
   const w = (s: Partial<WorkoutSet>) => (s.weight !== undefined ? fmtWeight(s.weight, unit) : '');
   const setW = (t: string) => {
     const n = parseNum(t);
@@ -139,16 +211,16 @@ function columns(ex: Exercise, unit: Unit): Columns {
     case 'assisted': {
       const sign = ex.kind === 'reps' ? '+' : '−';
       return {
-        a: { label: `${sign}${unit}`, get: w, set: setW },
-        b: { label: 'Reps', get: reps, set: setReps },
+        a: { label: `${sign}${unit}`, get: w, set: setW, step: loadStep },
+        b: { label: 'Reps', get: reps, set: setReps, step: 1 },
         complete: (s) => (s.reps ?? 0) > 0,
         fmt: (s) => (s.weight ? `${sign}${w(s)} × ${s.reps ?? 0}` : `${s.reps ?? 0} reps`),
       };
     }
     default:
       return {
-        a: { label: unit, get: w, set: setW },
-        b: { label: 'Reps', get: reps, set: setReps },
+        a: { label: unit, get: w, set: setW, step: loadStep },
+        b: { label: 'Reps', get: reps, set: setReps, step: 1 },
         complete: (s) => (s.reps ?? 0) > 0 && s.weight !== undefined,
         fmt: (s) => `${w(s) || '0'} × ${s.reps ?? 0}`,
       };
@@ -207,6 +279,7 @@ export function WorkoutEditor({ workout, onChange, live }: { workout: Workout; o
         />
       ))}
       <Button label="Add exercises" icon="plus" kind="secondary" onPress={() => setPicker({ mode: 'add' })} testID="add-exercises" />
+      <NumberBar />
       <ExercisePicker
         visible={picker !== null}
         multi={picker?.mode !== 'replace'}
@@ -479,6 +552,11 @@ function ExerciseBlock({
               <T v="bodyStrong" color={meta.colorKey === 'text' ? c.text : c[meta.colorKey]}>
                 {s.type === 'failure' ? `${n}F` : meta.short || String(n)}
               </T>
+              {s.rpe ? (
+                <T v="caption" faint style={{ fontSize: 9, lineHeight: 10, marginTop: -2 }}>
+                  @{fmtNum(s.rpe, 1)}
+                </T>
+              ) : null}
             </Pressable>
             <Pressable
               style={styles.cPrev}
@@ -495,6 +573,7 @@ function ExerciseBlock({
                   value={cols.a.get(s)}
                   placeholder={cols.a.get(ph)}
                   done={s.done}
+                  step={cols.a.step}
                   onCommit={(t) => updateSet(s.id, cols.a!.set(t))}
                 />
               </View>
@@ -506,6 +585,7 @@ function ExerciseBlock({
                 placeholder={cols.b.get(ph)}
                 done={s.done}
                 clock={cols.b.clock}
+                step={cols.b.step}
                 onCommit={(t) => updateSet(s.id, cols.b.set(t))}
               />
             </View>
@@ -541,7 +621,7 @@ function ExerciseBlock({
       </View>
 
       {/* Set type */}
-      <Sheet visible={typeFor !== null} onClose={() => setTypeFor(null)} title="Set type">
+      <Sheet visible={typeFor !== null} onClose={() => setTypeFor(null)} title="Set">
         <SheetScroll>
           {(['warmup', 'normal', 'drop', 'failure'] as SetType[]).map((t) => (
             <MenuRow
@@ -555,6 +635,26 @@ function ExerciseBlock({
               }}
             />
           ))}
+          {ex.kind === 'weight' || ex.kind === 'reps' || ex.kind === 'assisted' ? (
+            <>
+              <T v="label" dim style={{ marginTop: space(2) }}>
+                Effort (RPE)
+              </T>
+              <T v="caption" faint>
+                10 is all-out; 8 means two more reps were left. Counted in your 1RM estimates.
+              </T>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space(2) }}>
+                {[undefined, 6, 7, 7.5, 8, 8.5, 9, 9.5, 10].map((v) => (
+                  <Chip
+                    key={String(v)}
+                    label={v === undefined ? 'None' : fmtNum(v, 1)}
+                    active={we.sets.find((x) => x.id === typeFor)?.rpe === v}
+                    onPress={() => typeFor && updateSet(typeFor, { rpe: v })}
+                  />
+                ))}
+              </View>
+            </>
+          ) : null}
           <MenuRow
             icon="trash"
             label="Delete set"
@@ -579,7 +679,8 @@ function ExerciseBlock({
               onPress={() => {
                 setMenu(false);
                 const firstWork = we.sets.findIndex((s) => s.type !== 'warmup');
-                setPlates(firstWork >= 0 ? we.sets[firstWork].weight ?? placeholder(firstWork).weight ?? 0 : 0);
+                const kg = firstWork >= 0 ? we.sets[firstWork].weight ?? placeholder(firstWork).weight ?? 0 : 0;
+                afterModal(() => setPlates(kg));
               }}
             />
           )}
@@ -596,7 +697,7 @@ function ExerciseBlock({
               />
             ))}
           </View>
-          <MenuRow icon="note" label={we.notes ? 'Edit note' : 'Add note'} onPress={() => (setMenu(false), setNotes(true))} />
+          <MenuRow icon="note" label={we.notes ? 'Edit note' : 'Add note'} onPress={() => (setMenu(false), afterModal(() => setNotes(true)))} />
           {(we.superset || index < workout.exercises.length - 1) && (
             <MenuRow
               icon="link"
@@ -604,7 +705,7 @@ function ExerciseBlock({
               onPress={() => (setMenu(false), toggleSuperset())}
             />
           )}
-          <MenuRow icon="swap" label="Replace exercise" onPress={() => (setMenu(false), onReplace())} />
+          <MenuRow icon="swap" label="Replace exercise" onPress={() => (setMenu(false), afterModal(onReplace))} />
           {index > 0 && <MenuRow icon="up" label="Move up" onPress={() => (setMenu(false), move(-1))} />}
           {index < workout.exercises.length - 1 && <MenuRow icon="down" label="Move down" onPress={() => (setMenu(false), move(1))} />}
           <MenuRow icon="trash" label="Remove exercise" danger onPress={() => (setMenu(false), remove())} />
@@ -679,5 +780,7 @@ const styles = StyleSheet.create({
   blockFoot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: space(2) },
   addSet: { flexDirection: 'row', alignItems: 'center', gap: space(1.5), paddingVertical: space(2), paddingHorizontal: space(4), borderRadius: radius.md, flex: 1, justifyContent: 'center' },
   menuRow: { flexDirection: 'row', alignItems: 'center', gap: space(3), paddingVertical: space(2.5) },
+  bar: { flexDirection: 'row', alignItems: 'center', gap: space(2), paddingHorizontal: space(3), paddingVertical: space(2), borderTopWidth: StyleSheet.hairlineWidth },
+  barKey: { minWidth: 56, height: 38, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center', paddingHorizontal: space(3) },
   menuIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
 });

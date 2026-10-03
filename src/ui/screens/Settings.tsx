@@ -16,7 +16,7 @@ import {
   useStore,
 } from '../../state/store.ts';
 import { Icon, type IconName } from '../Icon.tsx';
-import { ask, Button, Card, confirm, Divider, SectionLabel, Segmented, Sheet, SheetScroll, T, toast } from '../kit.tsx';
+import { afterModal, ask, Button, Card, confirm, Divider, SectionLabel, Segmented, Sheet, SheetScroll, T, toast } from '../kit.tsx';
 import { Body, Header } from '../Screen.tsx';
 import { PlateCalculator } from '../tools.tsx';
 import { radius, space, useTheme } from '../theme.ts';
@@ -61,6 +61,8 @@ export function SettingsScreen() {
     try {
       const file = await pickTextFile();
       if (!file) return;
+      // The document picker is itself a modal that is still animating away.
+      await new Promise<void>((r) => afterModal(r));
       if (file.name.toLowerCase().endsWith('.json')) {
         restoreBackup(file.text);
         return;
@@ -203,7 +205,7 @@ export function SettingsScreen() {
           <SettingRow icon="copy" label="Back up everything" sub="One file with workouts, routines, body stats and settings" onPress={backup} />
           <SettingRow icon="history" label="Restore a backup" onPress={async () => {
             const f = await pickTextFile();
-            if (f) restoreBackup(f.text);
+            if (f) afterModal(() => restoreBackup(f.text));
           }} />
           <T v="caption" faint style={{ marginTop: space(2) }}>
             Everything lives on this phone. No account, no server, nothing is uploaded. Back up now and then, and keep the file somewhere safe.

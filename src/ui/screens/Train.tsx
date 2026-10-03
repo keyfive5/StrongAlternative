@@ -14,7 +14,7 @@ import {
   useStore,
 } from '../../state/store.ts';
 import { Icon } from '../Icon.tsx';
-import { ask, Button, Card, confirm, IconButton, SectionLabel, Sheet, SheetScroll, T, toast } from '../kit.tsx';
+import { afterModal, ask, Button, Card, confirm, IconButton, SectionLabel, Sheet, SheetScroll, T, toast } from '../kit.tsx';
 import { useNav } from '../nav.ts';
 import { ExercisePicker } from '../pickers.tsx';
 import { Body, Header } from '../Screen.tsx';
@@ -134,7 +134,7 @@ export function TrainScreen() {
             onPress={() => {
               const r = menuFor!;
               setMenuFor(null);
-              confirm(`Delete “${r.name}”?`, 'Workouts you did from it stay in your history.', 'Delete', () => deleteRoutine(r.id));
+              afterModal(() => confirm(`Delete “${r.name}”?`, 'Workouts you did from it stay in your history.', 'Delete', () => deleteRoutine(r.id)));
             }}
           />
         </SheetScroll>

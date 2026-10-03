@@ -69,7 +69,14 @@ async function allTerritories() {
     })),
   });
 
-  const after = await currentAvailability();
-  const total = after?.data?.relationships?.territoryAvailabilities?.meta?.paging?.total ?? 0;
+  // Apple applies the record asynchronously: straight after the POST it reads
+  // back as 0 territories, and the full list appears within a minute or so.
+  let total = 0;
+  for (let i = 0; i < 24 && total === 0; i++) {
+    if (i) await new Promise((r) => setTimeout(r, 5000));
+    const after = await currentAvailability();
+    total = after?.data?.relationships?.territoryAvailabilities?.meta?.paging?.total ?? 0;
+  }
+  if (!total) throw new Error('availability still reads 0 territories after two minutes; check Pricing and Availability');
   console.log(`\n✓ on sale in ${total} territories, and in new ones automatically`);
 })().catch((e) => { console.error('FAILED:', e.message); process.exit(1); });

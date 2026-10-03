@@ -260,7 +260,11 @@ export function ExerciseDetailScreen({ id }: { id: string }) {
                 </View>
                 {s.sets.map((set, i) => (
                   <T key={i} v="small" dim={!isWorking(set)} style={tabular}>
-                    {set.type === 'warmup' ? 'W  ' : set.type === 'drop' ? 'D  ' : set.type === 'failure' ? 'F  ' : `${i + 1}  `}
+                    {set.type === 'warmup'
+                      ? 'W  '
+                      : set.type === 'drop'
+                        ? 'D  '
+                        : `${s.sets.slice(0, i + 1).filter((x) => x.type === 'normal' || x.type === 'failure').length}${set.type === 'failure' ? 'F' : ''}  `}
                     {kind === 'time'
                       ? `${set.seconds ?? 0}s`
                       : kind === 'cardio'

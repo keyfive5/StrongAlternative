@@ -20,6 +20,7 @@ import {
   type WorkoutExercise,
   type WorkoutSet,
 } from '../core/types.ts';
+import { cancelRestEnd, scheduleRestEnd } from '../platform/notify.ts';
 import { storage } from '../platform/storage.ts';
 
 export interface RestTimer {
@@ -302,6 +303,7 @@ export function updateActive(fn: (w: Workout) => Workout) {
 }
 
 export function discardActive() {
+  void cancelRestEnd();
   set({ rest: null });
   setActive(null);
 }
@@ -317,6 +319,7 @@ export function finishActive(): Workout | null {
   const exercises = w.exercises
     .map((we) => ({ ...we, sets: we.sets.filter((s) => s.done) }))
     .filter((we) => we.sets.length);
+  void cancelRestEnd();
   set({ rest: null });
   setActive(null);
   if (!exercises.length) return null;
@@ -341,6 +344,7 @@ export function deleteWorkout(id: string) {
 export function startRest(seconds: number, exerciseName: string) {
   if (seconds <= 0) return;
   set({ rest: { endsAt: Date.now() + seconds * 1000, total: seconds, exerciseName } });
+  void scheduleRestEnd(seconds, exerciseName);
   saveActive();
 }
 
@@ -348,12 +352,18 @@ export function adjustRest(delta: number) {
   const r = state.rest;
   if (!r) return;
   const endsAt = r.endsAt + delta * 1000;
-  if (endsAt <= Date.now()) set({ rest: null });
-  else set({ rest: { ...r, endsAt, total: Math.max(1, r.total + delta) } });
+  if (endsAt <= Date.now()) {
+    set({ rest: null });
+    void cancelRestEnd();
+  } else {
+    set({ rest: { ...r, endsAt, total: Math.max(1, r.total + delta) } });
+    void scheduleRestEnd((endsAt - Date.now()) / 1000, r.exerciseName);
+  }
   saveActive();
 }
 
 export function stopRest() {
+  void cancelRestEnd();
   set({ rest: null });
   saveActive();
 }
@@ -388,6 +398,7 @@ export function replaceDatabase(raw: unknown): boolean {
 }
 
 export function eraseEverything() {
+  void cancelRestEnd();
   const db = emptyDb();
   set({ db, exercises: mergeExercises([]), active: null, rest: null });
   saveDb();

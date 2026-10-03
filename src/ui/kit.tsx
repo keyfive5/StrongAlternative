@@ -20,6 +20,17 @@ import { Icon, type IconName } from './Icon.tsx';
 import { radius, space, type, useTheme } from './theme.ts';
 import { getState } from '../state/store.ts';
 
+/**
+ * Run `fn` once a closing sheet has finished animating away. iOS will not
+ * present a new modal while another is still being dismissed — it fails
+ * silently — so any sheet that opens another sheet or a dialog goes through
+ * here. The browser has no such rule.
+ */
+export function afterModal(fn: () => void) {
+  if (Platform.OS === 'ios') setTimeout(fn, 450);
+  else fn();
+}
+
 export function haptic(kind: 'light' | 'medium' | 'success' | 'warning' = 'light') {
   if (Platform.OS === 'web' || !getState().db.settings.haptics) return;
   try {
