@@ -7,7 +7,7 @@
     "start": "expo start",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --no-warnings scripts/test-core.mjs && node --experimental-strip-types --no-warnings scripts/test-csv.mjs",
+    "test": "node --experimental-strip-types --no-warnings scripts/test-core.mjs && node --experimental-strip-types --no-warnings scripts/test-csv.mjs && node --experimental-strip-types --no-warnings scripts/test-storage.mjs",
     "assets": "node scripts/make-assets.mjs",
     "screenshots": "node scripts/make-screenshots.mjs",
     "metadata": "node scripts/check-metadata.mjs"
