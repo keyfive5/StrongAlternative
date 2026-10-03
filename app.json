@@ -1,0 +1,47 @@
+{
+  "expo": {
+    "name": "Overload",
+    "slug": "overload-lifts",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "overload",
+    "userInterfaceStyle": "automatic",
+    "backgroundColor": "#0B0C0E",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0B0C0E"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.hasanzafar.overload",
+      "buildNumber": "1",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "CFBundleDisplayName": "Overload",
+        "LSSupportsOpeningDocumentsInPlace": false,
+        "UIFileSharingEnabled": false
+      }
+    },
+    "android": {
+      "package": "com.hasanzafar.overload",
+      "adaptiveIcon": {
+        "backgroundColor": "#0B0C0E",
+        "foregroundImage": "./assets/android-icon-foreground.png"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": ["expo-sharing", "expo-document-picker"],
+    "owner": "keyfive",
+    "extra": {
+      "eas": {
+        "projectId": "00000000-0000-0000-0000-000000000000"
+      }
+    }
+  }
+}
