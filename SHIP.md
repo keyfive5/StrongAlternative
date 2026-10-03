@@ -166,8 +166,28 @@ node scripts/asc-submit.mjs
 - Categories are read from `store/metadata.mjs`; they used to be hardcoded, so
   a copied script will silently file the app under the wrong category.
 
+## Learned on this app (Oct 2026)
+
+- **expo-notifications adds `aps-environment` even when only local
+  notifications are used.** Expo applies its config plugin automatically once
+  the package is installed. A provisioning profile for a bundle id without
+  the Push Notifications capability then fails to sign it, so
+  `gen-ios-creds.mjs` enables `PUSH_NOTIFICATIONS` on the bundle id before
+  making the profile. Check with `npx expo config --type introspect`.
+- **Availability is applied asynchronously.** Straight after the POST,
+  `/v2/appAvailabilities/{id}` reads back 0 territories; a minute later it
+  shows all 175. The script now polls instead of reporting 0.
+- **`File.move` is asynchronous in expo-file-system 57.** Not awaiting it lost
+  saves on device (the browser build uses localStorage and cannot show it).
+  `scripts/test-storage.mjs` runs the storage class against a fake filesystem
+  with the same async, no-clobber move.
+- The App Store Connect New App dialog: text fields take real clicks and
+  typing; the two dropdowns need click, type the option text, then Return.
+  Setting their value programmatically is ignored.
+
 ## This app
 
-- App Store Connect id: written to `.ascappid` by `asc-create-app.mjs`
-- Bundle `com.hasanzafar.overload`, SKU `OVERLOAD2026`
-- EAS project, certificate and profile ids: filled in after steps 1–2
+- App Store Connect id **6818696263** (also in `.ascappid`)
+- Bundle `com.hasanzafar.overload` (bundle id record 5TTGQ6J48P), SKU `OVERLOAD2026`
+- EAS project `2e944a56-169c-4a78-8d75-638dc90cac87`
+- Distribution certificate DNL88X8YD9, provisioning profile GPU763T4X9
