@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import {
+  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -360,13 +361,19 @@ export function Sheet({
   const insets = useSafeAreaInsets();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
-      <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+      {/* A modal is outside the screen's own keyboard handling, so a sheet
+          with a text field would sit under the keyboard, Save button and all.
+          The sheet rides up with the keyboard instead, shrinking if it has to. */}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ flex: 1, justifyContent: 'flex-end', paddingTop: insets.top + space(6) }}
+      >
         <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: c.overlay }]} onPress={onClose} accessibilityLabel="Close" />
         <View
           style={[
             styles.sheet,
             { backgroundColor: c.surface, paddingBottom: Math.max(insets.bottom, space(4)) },
-            full ? { height: '92%' } : { maxHeight: '88%' },
+            full ? { flexGrow: 1, flexShrink: 1 } : { flexShrink: 1 },
           ]}
         >
           <View style={[styles.grabber, { backgroundColor: c.border }]} />
@@ -381,7 +388,7 @@ export function Sheet({
           ) : null}
           {children}
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
