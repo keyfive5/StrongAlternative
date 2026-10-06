@@ -2,13 +2,15 @@
 
 import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { exerciseHistory, weekStart, weekStreak, workoutPrs, workoutSetCount, workoutVolume } from '../../core/analytics.ts';
-import { suggest, type Suggestion } from '../../core/coach.ts';
+import { weekStart, weekStreak, workoutPrs, workoutSetCount, workoutVolume } from '../../core/analytics.ts';
+import type { Suggestion } from '../../core/coach.ts';
+import type { Prescription } from '../../core/insight.ts';
 import type { Exercise, Routine, Workout } from '../../core/types.ts';
 import { fmtBig, fmtWeight, toDisplay } from '../../core/units.ts';
-import { startWorkout, useStore } from '../../state/store.ts';
+import { clearSampleData, hasSampleData, startWorkout, useStore } from '../../state/store.ts';
+import { coachFor, diagnosisFor, useHistories } from '../coaching.ts';
 import { Icon } from '../Icon.tsx';
-import { Button, Card, IconButton, SectionLabel, Stat, T } from '../kit.tsx';
+import { Button, Card, confirm, IconButton, SectionLabel, Stat, T } from '../kit.tsx';
 import { useNav } from '../nav.ts';
 import { Body, Header } from '../Screen.tsx';
 import { fmtDate, radius, relativeDay, space, useTheme } from '../theme.ts';
@@ -50,21 +52,23 @@ export function TodayScreen() {
 
   // The overload board: every exercise trained in the last six weeks, sorted
   // into "ready to go up" and "stalled".
+  const histories = useHistories();
+  const sample = useStore((s) => hasSampleData(s.db));
   const board = useMemo(() => {
     const since = Date.now() - 42 * 86400000;
     const ids = new Set<string>();
     for (const w of finished) if (w.start >= since) for (const e of w.exercises) ids.add(e.exerciseId);
     const up: { ex: Exercise; s: Suggestion }[] = [];
-    const stuck: { ex: Exercise; s: Suggestion }[] = [];
+    const stuck: { ex: Exercise; s: Suggestion; rx: Prescription[] }[] = [];
     for (const id of ids) {
       const ex = exercises.get(id);
       if (!ex || ex.kind === 'cardio' || ex.kind === 'time') continue;
-      const s = suggest(ex, exerciseHistory(finished, id, settings.rpeAdjust), unit);
+      const s = coachFor(ex, histories, exercises, unit, settings.goal);
       if (s.action === 'increase') up.push({ ex, s });
-      else if (s.action === 'deload' || s.action === 'hold') stuck.push({ ex, s });
+      else if (s.action === 'deload' || s.action === 'hold') stuck.push({ ex, s, rx: diagnosisFor(ex, histories, finished, exercises, settings) });
     }
     return { up: up.slice(0, 6), stuck: stuck.slice(0, 4) };
-  }, [finished, exercises, unit, settings.rpeAdjust]);
+  }, [finished, exercises, unit, settings, histories]);
 
   const recentPrs = useMemo(() => {
     const out: { w: Workout; label: string; exName: string }[] = [];
@@ -88,6 +92,22 @@ export function TodayScreen() {
         right={<IconButton name="settings" label="Settings" onPress={() => nav.push({ name: 'settings' })} bg={c.surfaceAlt} />}
       />
       <Body>
+        {sample ? (
+          <View style={[styles.sample, { backgroundColor: c.surfaceAlt, borderColor: c.border }]} testID="sample-banner">
+            <Icon name="info" size={18} color={c.info} />
+            <T v="small" dim style={{ flex: 1 }}>
+              You are exploring six months of sample training. Everything works on it; clear it when you are ready to log your own.
+            </T>
+            <Button
+              label="Clear"
+              kind="secondary"
+              small
+              onPress={() =>
+                confirm('Clear the sample data?', 'Sample workouts, routines and measurements are removed. Anything you logged yourself stays.', 'Clear sample data', clearSampleData, false)
+              }
+            />
+          </View>
+        ) : null}
         {active ? (
           <Card style={{ borderColor: c.accent, borderWidth: 1 }} onPress={nav.openWorkout}>
             <T v="label" color={c.accent}>
@@ -206,7 +226,7 @@ export function TodayScreen() {
           <>
             <SectionLabel>Stalled</SectionLabel>
             <Card style={{ paddingVertical: space(1) }}>
-              {board.stuck.map(({ ex, s }) => (
+              {board.stuck.map(({ ex, s, rx }) => (
                 <Pressable key={ex.id} onPress={() => nav.push({ name: 'exercise', id: ex.id })} style={styles.boardRow}>
                   <View style={[styles.dot, { backgroundColor: c.goldSoft }]}>
                     <Icon name="info" size={16} color={c.gold} strokeWidth={2.4} />
@@ -216,7 +236,7 @@ export function TodayScreen() {
                       {ex.name}
                     </T>
                     <T v="small" dim numberOfLines={1}>
-                      {s.action === 'deload' ? s.headline : `${s.stalled} sessions without progress`}
+                      {rx[0] ? `Try: ${rx[0].title}` : s.action === 'deload' ? s.headline : `${s.stalled} sessions without progress`}
                     </T>
                   </View>
                   <Icon name="chevron" size={16} color={c.textFaint} />
@@ -281,6 +301,7 @@ function greeting(): string {
 }
 
 const styles = StyleSheet.create({
+  sample: { flexDirection: 'row', alignItems: 'center', gap: space(3), padding: space(3), borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, marginBottom: space(3) },
   line: { flexDirection: 'row', alignItems: 'center' },
   streak: { flexDirection: 'row', alignItems: 'center', gap: space(2), padding: space(3), borderRadius: radius.md, marginTop: space(4) },
   boardRow: { flexDirection: 'row', alignItems: 'center', gap: space(3), paddingVertical: space(2.5) },

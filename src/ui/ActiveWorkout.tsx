@@ -76,7 +76,7 @@ export function RestBar({ compact }: { compact?: boolean }) {
       <Pressable onPress={() => adjustRest(15)} style={[styles.restBtn, { backgroundColor: c.surfaceAlt }]} accessibilityLabel="15 seconds more">
         <T v="smallStrong">+15</T>
       </Pressable>
-      <Pressable onPress={stopRest} style={[styles.restBtn, { backgroundColor: c.accent }]} accessibilityLabel="Skip rest">
+      <Pressable onPress={stopRest} style={[styles.restBtn, { backgroundColor: c.accent }]} accessibilityLabel="Skip rest" testID="rest-skip">
         <T v="smallStrong" color={c.accentText}>
           Skip
         </T>

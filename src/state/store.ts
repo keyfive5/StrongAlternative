@@ -5,6 +5,7 @@
 // so selectors see new references, then schedules a save.
 
 import { useSyncExternalStore, useRef } from 'react';
+import { sampleData } from '../core/demo.ts';
 import { LIBRARY } from '../core/library.ts';
 import {
   DEFAULT_SETTINGS,
@@ -144,13 +145,15 @@ export async function load() {
 
 function migrate(raw: Partial<Database>): Database {
   const base = emptyDb();
+  // Someone who already has a log has, by definition, been through the start.
+  const onboarded = raw.settings?.onboarded ?? (raw.workouts?.length ?? 0) > 0;
   return {
     version: 1,
     exercises: raw.exercises ?? [],
     workouts: raw.workouts ?? [],
     routines: raw.routines ?? [],
     measurements: raw.measurements ?? [],
-    settings: { ...base.settings, ...(raw.settings ?? {}) },
+    settings: { ...base.settings, ...(raw.settings ?? {}), onboarded },
   };
 }
 
@@ -377,6 +380,42 @@ export function addMeasurement(m: Omit<Measurement, 'id'>) {
 
 export function deleteMeasurement(id: string) {
   updateDb({ measurements: state.db.measurements.filter((m) => m.id !== id) });
+}
+
+// ---------------------------------------------------------------------------
+// First launch and sample data
+
+export function completeOnboarding(patch: Partial<Settings> = {}) {
+  updateSettings({ ...patch, onboarded: true });
+}
+
+/** Six months of example training, so the coach has something to show. */
+export function loadSampleData() {
+  const data = sampleData(state.db.exercises);
+  updateDb({
+    workouts: [...state.db.workouts.filter((w) => !w.sample), ...data.workouts],
+    routines: [...state.db.routines.filter((r) => !r.sample), ...data.routines],
+    measurements: [...state.db.measurements.filter((m) => !m.sample), ...data.measurements],
+    exercises: [...state.db.exercises, ...data.exercises],
+  });
+}
+
+export function hasSampleData(db: Database): boolean {
+  return db.workouts.some((w) => w.sample);
+}
+
+/** Removes every sample record and nothing the user logged themselves. */
+export function clearSampleData() {
+  const sampleRoutines = new Set(state.db.routines.filter((r) => r.sample).map((r) => r.id));
+  updateDb({
+    workouts: state.db.workouts.filter((w) => !w.sample),
+    routines: state.db.routines.filter((r) => !r.sample),
+    measurements: state.db.measurements.filter((m) => !m.sample),
+  });
+  // A workout started from a sample routine keeps going; it just loses the link.
+  if (state.active?.routineId && sampleRoutines.has(state.active.routineId)) {
+    setActive({ ...state.active, routineId: undefined });
+  }
 }
 
 // ---------------------------------------------------------------------------

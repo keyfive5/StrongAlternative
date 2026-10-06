@@ -1,6 +1,6 @@
 // Settings, plates, and moving your data in and out.
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Switch, TextInput, View } from 'react-native';
 import Constants from 'expo-constants';
 import { exportCsv, importCsv, type ImportResult } from '../../core/csv.ts';
@@ -8,9 +8,12 @@ import type { Unit } from '../../core/types.ts';
 import { fmtNum, fromDisplay, parseNum, toDisplay } from '../../core/units.ts';
 import { pickTextFile, shareTextFile } from '../../platform/files.ts';
 import {
+  clearSampleData,
   eraseEverything,
   getState,
+  hasSampleData,
   importData,
+  loadSampleData,
   replaceDatabase,
   updateSettings,
   useStore,
@@ -48,10 +51,11 @@ function SettingRow({ icon, label, sub, right, onPress }: { icon: IconName; labe
   );
 }
 
-export function SettingsScreen() {
+export function SettingsScreen({ autoImport }: { autoImport?: boolean } = {}) {
   const c = useTheme();
   const settings = useStore((s) => s.db.settings);
   const workoutCount = useStore((s) => s.db.workouts.length);
+  const sample = useStore((s) => hasSampleData(s.db));
   const unit = settings.unit;
   const [plates, setPlates] = useState(false);
   const [calc, setCalc] = useState(false);
@@ -78,6 +82,15 @@ export function SettingsScreen() {
       ask('Could not read the file', String((e as Error).message ?? e), [{ label: 'OK' }]);
     }
   };
+
+  // Arriving from "Bring your history" on first launch opens the picker directly.
+  const autoImported = useRef(false);
+  useEffect(() => {
+    if (autoImport && !autoImported.current) {
+      autoImported.current = true;
+      afterModal(() => void startImport());
+    }
+  }, [autoImport]);
 
   const restoreBackup = (text: string) => {
     let parsed: unknown;
@@ -143,6 +156,27 @@ export function SettingsScreen() {
 
         <SectionLabel>Training</SectionLabel>
         <Card>
+          <T v="label" dim style={{ marginBottom: space(2) }}>
+            Goal
+          </T>
+          <Segmented
+            options={[
+              { value: 'strength', label: 'Strength' },
+              { value: 'muscle', label: 'Muscle' },
+              { value: 'general', label: 'Both' },
+            ]}
+            value={settings.goal}
+            onChange={(g) => updateSettings({ goal: g as 'strength' | 'muscle' | 'general' })}
+          />
+          <T v="caption" faint style={{ marginTop: space(2), marginBottom: space(2) }}>
+            {settings.goal === 'strength'
+              ? 'Heavy lifts work in 3–5 reps, other compounds 5–8, isolation 8–12.'
+              : settings.goal === 'muscle'
+                ? 'Heavy lifts work in 6–10 reps, other compounds 8–12, isolation 10–15.'
+                : 'Heavy lifts work in 5–8 reps, other compounds 8–12, isolation 10–15.'}{' '}
+            An exercise's own range always wins.
+          </T>
+          <Divider />
           <SettingRow
             icon="timer"
             label="Rest timer"
@@ -207,6 +241,29 @@ export function SettingsScreen() {
             const f = await pickTextFile();
             if (f) afterModal(() => restoreBackup(f.text));
           }} />
+          {sample ? (
+            <SettingRow
+              icon="trash"
+              label="Clear sample data"
+              sub="Removes the example training. Anything you logged stays."
+              onPress={() =>
+                confirm('Clear the sample data?', 'Sample workouts, routines and measurements are removed. Anything you logged yourself stays.', 'Clear sample data', () => {
+                  clearSampleData();
+                  toast('Sample data cleared', 'check');
+                }, false)
+              }
+            />
+          ) : (
+            <SettingRow
+              icon="chart"
+              label="Explore with sample data"
+              sub="Six months of example training, clearly marked and removable"
+              onPress={() => {
+                loadSampleData();
+                toast('Sample data loaded', 'check');
+              }}
+            />
+          )}
           <T v="caption" faint style={{ marginTop: space(2) }}>
             Everything lives on this phone. No account, no server, nothing is uploaded. Back up now and then, and keep the file somewhere safe.
           </T>

@@ -3,8 +3,9 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { InputAccessoryView, Keyboard, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
-import { e1rm, exerciseHistory, type Session } from '../core/analytics.ts';
+import { allHistories, e1rm, type Session } from '../core/analytics.ts';
 import { incrementKg, suggest, type Suggestion, type Target } from '../core/coach.ts';
+import { readiness, startingEstimate } from '../core/insight.ts';
 import { warmupRamp } from '../core/plates.ts';
 import type { Exercise, SetType, Unit, Workout, WorkoutExercise, WorkoutSet } from '../core/types.ts';
 import { uid } from '../core/types.ts';
@@ -18,6 +19,8 @@ import { PlateCalculator } from './tools.tsx';
 import { radius, space, tabular, useTheme } from './theme.ts';
 
 type Change = (fn: (w: Workout) => Workout) => void;
+
+const NO_HISTORY: Session[] = [];
 
 // ---------------------------------------------------------------------------
 // Number entry that keeps what you are typing ("62." is not yet a number).
@@ -253,9 +256,11 @@ function workingIndex(sets: WorkoutSet[], index: number): number {
 export function WorkoutEditor({ workout, onChange, live }: { workout: Workout; onChange: Change; live: boolean }) {
   const workouts = useStore((s) => s.db.workouts);
   const [picker, setPicker] = useState<{ mode: 'add' } | { mode: 'replace'; id: string } | null>(null);
-  const prior = useMemo(
-    () => workouts.filter((w) => w.end && w.start < workout.start && w.id !== workout.id),
-    [workouts, workout.start, workout.id],
+  const rpeAdjust = useStore((s) => s.db.settings.rpeAdjust);
+  // Every exercise's history before this workout, built once for all blocks.
+  const histories = useMemo(
+    () => allHistories(workouts.filter((w) => w.end && w.start < workout.start && w.id !== workout.id), rpeAdjust),
+    [workouts, workout.start, workout.id, rpeAdjust],
   );
 
   const addExercises = (ids: string[]) =>
@@ -272,7 +277,7 @@ export function WorkoutEditor({ workout, onChange, live }: { workout: Workout; o
           we={we}
           index={i}
           workout={workout}
-          prior={prior}
+          histories={histories}
           onChange={onChange}
           live={live}
           onReplace={() => setPicker({ mode: 'replace', id: we.id })}
@@ -303,7 +308,7 @@ function ExerciseBlock({
   we,
   index,
   workout,
-  prior,
+  histories,
   onChange,
   live,
   onReplace,
@@ -311,7 +316,7 @@ function ExerciseBlock({
   we: WorkoutExercise;
   index: number;
   workout: Workout;
-  prior: Workout[];
+  histories: Map<string, Session[]>;
   onChange: Change;
   live: boolean;
   onReplace: () => void;
@@ -323,9 +328,20 @@ function ExerciseBlock({
   const unit = settings.unit;
   const ex: Exercise =
     exercises.get(we.exerciseId) ?? { id: we.exerciseId, name: 'Unknown exercise', muscle: 'other', secondary: [], equipment: 'other', kind: 'weight' };
-  const history: Session[] = useMemo(() => exerciseHistory(prior, ex.id, settings.rpeAdjust), [prior, ex.id, settings.rpeAdjust]);
+  const history: Session[] = histories.get(ex.id) ?? NO_HISTORY;
   const last = history[history.length - 1];
-  const coach: Suggestion | null = useMemo(() => (live ? suggest(ex, history, unit) : null), [live, ex, history, unit]);
+  const goal = settings.goal;
+  const coach: Suggestion | null = useMemo(() => {
+    if (!live) return null;
+    // A lift never done before starts from the lifter's strength on a relative.
+    const est = history.length ? undefined : startingEstimate(ex, histories, unit, goal);
+    const from = est ? exercises.get(est.fromId)?.name.replace(/\s*\(.*\)\s*$/, '').toLowerCase() : undefined;
+    return suggest(ex, history, unit, { goal, start: est && from ? { ...est, fromName: from } : undefined });
+  }, [live, ex, history, histories, unit, goal, exercises]);
+  // How today compares with the usual, once there is a set to judge by.
+  const ready = live ? readiness(ex, history, we.sets, unit, goal) : null;
+  const readyApplied =
+    !!ready && we.sets.filter((s) => !s.done && s.type !== 'warmup').every((s) => Math.abs((s.weight ?? -1) - ready.weightKg) < 0.01);
   const bestE1rm = useMemo(() => Math.max(0, ...history.map((h) => h.bestE1rm ?? 0)), [history]);
   const bestWeight = useMemo(() => Math.max(0, ...history.map((h) => h.topWeight ?? 0)), [history]);
   const cols = columns(ex, unit);
@@ -494,7 +510,7 @@ function ExerciseBlock({
         </Pressable>
       ) : null}
 
-      {coach && coach.action !== 'first' ? (
+      {coach && (coach.action !== 'first' || coach.sets.length > 0) ? (
         <Pressable onPress={() => setShowCoach((v) => !v)} style={[styles.coach, { backgroundColor: coach.action === 'deload' ? c.goldSoft : c.accentSoft }]}>
           <Icon name={coach.action === 'deload' ? 'info' : coach.action === 'increase' ? 'up' : 'target'} size={16} color={coach.action === 'deload' ? c.gold : c.accent} strokeWidth={2.4} />
           <View style={{ flex: 1 }}>
@@ -515,6 +531,39 @@ function ExerciseBlock({
           <T v="small" dim style={{ flex: 1 }}>
             {coach.detail}
           </T>
+        </View>
+      ) : null}
+
+      {ready && !readyApplied ? (
+        <View
+          testID={`readiness-${index}`}
+          style={[styles.coach, { backgroundColor: ready.kind === 'low' ? c.goldSoft : c.accentSoft, alignItems: 'flex-start' }]}
+        >
+          <Icon name={ready.kind === 'low' ? 'info' : 'bolt'} size={16} color={ready.kind === 'low' ? c.gold : c.accent} strokeWidth={2.4} />
+          <View style={{ flex: 1, gap: 2 }}>
+            <T v="smallStrong" color={ready.kind === 'low' ? c.gold : c.accent}>
+              {ready.headline}
+            </T>
+            <T v="small" dim>
+              {ready.detail}
+            </T>
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Use ${fmtWeight(ready.weightKg, unit)} ${unit} for the remaining sets`}
+            onPress={() => {
+              haptic();
+              update((x) => ({
+                ...x,
+                sets: x.sets.map((s) => (!s.done && s.type !== 'warmup' ? { ...s, weight: ready.weightKg } : s)),
+              }));
+            }}
+            style={[styles.applyBtn, { backgroundColor: ready.kind === 'low' ? c.gold : c.accent }]}
+          >
+            <T v="smallStrong" color={c.accentText}>
+              Use {fmtWeight(ready.weightKg, unit)}
+            </T>
+          </Pressable>
         </View>
       ) : null}
 
@@ -780,6 +829,7 @@ const styles = StyleSheet.create({
   blockFoot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: space(2) },
   addSet: { flexDirection: 'row', alignItems: 'center', gap: space(1.5), paddingVertical: space(2), paddingHorizontal: space(4), borderRadius: radius.md, flex: 1, justifyContent: 'center' },
   menuRow: { flexDirection: 'row', alignItems: 'center', gap: space(3), paddingVertical: space(2.5) },
+  applyBtn: { paddingHorizontal: space(3), paddingVertical: space(2), borderRadius: radius.sm, alignSelf: 'center' },
   bar: { flexDirection: 'row', alignItems: 'center', gap: space(2), paddingHorizontal: space(3), paddingVertical: space(2), borderTopWidth: StyleSheet.hairlineWidth },
   barKey: { minWidth: 56, height: 38, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center', paddingHorizontal: space(3) },
   menuIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },

@@ -14,6 +14,7 @@ import { MeasureDetailScreen, ProgressScreen } from './src/ui/screens/Progress.t
 import { SettingsScreen } from './src/ui/screens/Settings.tsx';
 import { EditWorkoutScreen, SummaryScreen, WorkoutDetailScreen } from './src/ui/screens/Summary.tsx';
 import { TodayScreen } from './src/ui/screens/Today.tsx';
+import { WelcomeScreen } from './src/ui/screens/Welcome.tsx';
 import { RoutineEditorScreen, TrainScreen } from './src/ui/screens/Train.tsx';
 
 const TABS: { tab: Tab; label: string; icon: IconName }[] = [
@@ -35,7 +36,7 @@ function RouteView({ route }: { route: Route }) {
     case 'routine':
       return <RoutineEditorScreen id={route.id} />;
     case 'settings':
-      return <SettingsScreen />;
+      return <SettingsScreen autoImport={route.autoImport} />;
     case 'measure':
       return <MeasureDetailScreen kind={route.kind} />;
     case 'summary':
@@ -65,6 +66,7 @@ function Shell() {
   const ready = useStore((s) => s.ready);
   const themePref = useStore((s) => s.db.settings.theme);
   const active = useStore((s) => s.active);
+  const onboarded = useStore((s) => s.db.settings.onboarded);
   const system = useColorScheme();
   const palette = (themePref === 'system' ? system ?? 'dark' : themePref) === 'light' ? LIGHT : DARK;
   const c = palette;
@@ -137,6 +139,7 @@ function Shell() {
             </View>
           )}
           {workoutOpen && active ? <ActiveWorkoutScreen /> : null}
+          {!onboarded ? <WelcomeScreen onImport={() => nav.push({ name: 'settings', autoImport: true })} /> : null}
         </View>
         <RestWatcher />
         <DialogHost />

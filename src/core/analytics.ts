@@ -88,6 +88,25 @@ export function exerciseHistory(workouts: Workout[], exerciseId: string, rpeAdju
   return out.sort((a, b) => a.date - b.date);
 }
 
+/** Every exercise's history in one pass over the log, keyed by exercise id. */
+export function allHistories(workouts: Workout[], rpeAdjust = true): Map<string, Session[]> {
+  const sets = new Map<string, { w: Workout; sets: WorkoutSet[] }[]>();
+  for (const w of [...workouts].sort((a, b) => a.start - b.start)) {
+    if (!w.end) continue;
+    const byEx = new Map<string, WorkoutSet[]>();
+    for (const we of w.exercises) byEx.set(we.exerciseId, [...(byEx.get(we.exerciseId) ?? []), ...we.sets]);
+    for (const [id, list] of byEx) {
+      if (!list.some((s) => s.done)) continue;
+      const cur = sets.get(id) ?? [];
+      cur.push({ w, sets: list });
+      sets.set(id, cur);
+    }
+  }
+  const out = new Map<string, Session[]>();
+  for (const [id, list] of sets) out.set(id, list.map(({ w, sets }) => sessionStats(w.id, w.start, sets, rpeAdjust)));
+  return out;
+}
+
 export interface Records {
   bestE1rm?: { value: number; date: number; set: WorkoutSet };
   heaviest?: { value: number; date: number; reps: number };

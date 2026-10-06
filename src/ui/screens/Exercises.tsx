@@ -2,8 +2,8 @@
 
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { exerciseHistory, isWorking, records, trendPerMonth, weightForReps } from '../../core/analytics.ts';
-import { incrementKg, repRange, suggest } from '../../core/coach.ts';
+import { isWorking, records, trendPerMonth, weightForReps, type Session } from '../../core/analytics.ts';
+import { incrementKg, repRange } from '../../core/coach.ts';
 import { equipmentLabel } from '../../core/library.ts';
 import type { Muscle } from '../../core/types.ts';
 import { fmtBig, fmtDuration, fmtEst, fmtNum, fmtWeight, fromDisplay, parseNum, toDisplay } from '../../core/units.ts';
@@ -13,6 +13,7 @@ import { Icon } from '../Icon.tsx';
 import { Button, Card, Chip, confirm, Empty, Field, IconButton, SectionLabel, Segmented, Sheet, SheetScroll, Stat, T, toast } from '../kit.tsx';
 import { useNav } from '../nav.ts';
 import { cap, ExerciseForm, ExerciseList, MuscleChips, SearchBox } from '../pickers.tsx';
+import { coachFor, diagnosisFor, useHistories } from '../coaching.ts';
 import { Body, Header } from '../Screen.tsx';
 import { relativeDay, space, tabular, useTheme } from '../theme.ts';
 
@@ -61,7 +62,9 @@ export function ExerciseDetailScreen({ id }: { id: string }) {
   const [editing, setEditing] = useState(false);
   const [coachSettings, setCoachSettings] = useState(false);
 
-  const history = useMemo(() => exerciseHistory(workouts, id, settings.rpeAdjust), [workouts, id, settings.rpeAdjust]);
+  const exercises = useStore((s) => s.exercises);
+  const histories = useHistories();
+  const history = histories.get(id) ?? NO_HISTORY;
   const rec = useMemo(() => records(history), [history]);
   const kind = ex?.kind ?? 'weight';
   const metrics: { value: Metric; label: string }[] =
@@ -95,8 +98,9 @@ export function ExerciseDetailScreen({ id }: { id: string }) {
   }, [history, metric, range, kind]);
 
   if (!ex) return null;
-  const coach = suggest(ex, history, unit);
-  const [lo, hi] = repRange(ex);
+  const coach = coachFor(ex, histories, exercises, unit, settings.goal);
+  const diagnosis = coach.stalled >= 2 ? diagnosisFor(ex, histories, workouts, exercises, settings) : [];
+  const [lo, hi] = repRange(ex, settings.goal);
   const isWeight = metric === 'e1rm' || metric === 'top' || metric === 'volume';
   const fmt = (v: number) =>
     isWeight
@@ -147,6 +151,32 @@ export function ExerciseDetailScreen({ id }: { id: string }) {
                 {coach.detail}
               </T>
             </Card>
+
+            {diagnosis.length ? (
+              <>
+                <SectionLabel>Why it has stalled</SectionLabel>
+                <Card testID="diagnosis">
+                  <T v="small" dim style={{ marginBottom: space(2) }}>
+                    {coach.stalled} sessions without a new best at this weight. From your log, in order of what usually helps most:
+                  </T>
+                  {diagnosis.map((d, i) => (
+                    <View key={i} style={[styles.rx, i > 0 && { borderTopColor: c.border, borderTopWidth: StyleSheet.hairlineWidth }]}>
+                      <View style={[styles.rxNum, { backgroundColor: c.goldSoft }]}>
+                        <T v="smallStrong" color={c.gold}>
+                          {i + 1}
+                        </T>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <T v="bodyStrong">{d.title}</T>
+                        <T v="small" dim>
+                          {d.detail}
+                        </T>
+                      </View>
+                    </View>
+                  ))}
+                </Card>
+              </>
+            ) : null}
 
             <SectionLabel>Chart</SectionLabel>
             <Card>
@@ -299,7 +329,7 @@ export function ExerciseDetailScreen({ id }: { id: string }) {
 }
 
 /** The best e1RM among the last four sessions: "today", not "ever". */
-function latestE1rm(history: ReturnType<typeof exerciseHistory>): number | undefined {
+function latestE1rm(history: Session[]): number | undefined {
   const recent = history.slice(-4).map((s) => s.bestE1rm ?? 0);
   const best = Math.max(0, ...recent);
   return best > 0 ? best : undefined;
@@ -308,12 +338,13 @@ function latestE1rm(history: ReturnType<typeof exerciseHistory>): number | undef
 function CoachSettings({ visible, onClose, id }: { visible: boolean; onClose: () => void; id: string }) {
   const ex = useStore((s) => s.exercises.get(id));
   const unit = useStore((s) => s.db.settings.unit);
+  const goal = useStore((s) => s.db.settings.goal);
   const [lo, setLo] = useState('');
   const [hi, setHi] = useState('');
   const [inc, setInc] = useState('');
   React.useEffect(() => {
     if (visible && ex) {
-      const [a, b] = repRange(ex);
+      const [a, b] = repRange(ex, goal);
       setLo(String(a));
       setHi(String(b));
       setInc(fmtNum(toDisplay(incrementKg(ex, unit), unit), 2));
@@ -365,7 +396,11 @@ function CoachSettings({ visible, onClose, id }: { visible: boolean; onClose: ()
   );
 }
 
+const NO_HISTORY: Session[] = [];
+
 const styles = StyleSheet.create({
+  rx: { flexDirection: 'row', gap: space(3), paddingVertical: space(3) },
+  rxNum: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
   predictRow: { flexDirection: 'row' },
   rmRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: space(2.5), borderBottomWidth: StyleSheet.hairlineWidth },
 });

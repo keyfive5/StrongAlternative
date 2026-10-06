@@ -150,6 +150,8 @@ describe('coach: stalls and deloads', () => {
   const s = suggest(bench, h, 'kg');
   eq(s.action, 'deload', 'three stalls: deload');
   eq(s.sets[0].weight, 90, 'deload is 10%');
+  const odd = suggest(bench, exerciseHistory([0, 3, 7, 10].map((d) => workout(d, bench.id, [set(55, 6), set(55, 6)])), bench.id), 'kg');
+  eq(odd.sets[0].weight, 47.5, 'a 10% deload from 55 kg rounds down to a loadable 47.5, not 49.5');
   const progressing = exerciseHistory([workout(0, bench.id, [set(100, 5)]), workout(3, bench.id, [set(100, 6)]), workout(6, bench.id, [set(100, 7)])], bench.id);
   eq(stallCount(progressing), 0, 'adding a rep each time is never a stall');
   const reset = exerciseHistory([workout(0, bench.id, [set(100, 5)]), workout(3, bench.id, [set(90, 5)]), workout(6, bench.id, [set(90, 5)])], bench.id);

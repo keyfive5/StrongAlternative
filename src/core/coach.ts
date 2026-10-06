@@ -32,15 +32,29 @@ export interface Suggestion {
 
 const ISOLATION = new Set(['biceps', 'triceps', 'forearms', 'calves', 'core', 'shoulders', 'adductors']);
 
-/** The rep range the coach works in, from the exercise or a sensible default. */
-export function repRange(ex: Exercise): [number, number] {
-  if (ex.repMin && ex.repMax && ex.repMax >= ex.repMin) return [ex.repMin, ex.repMax];
-  if (ex.kind === 'reps') return [6, 12];
+/** What the lifter is training for; it moves every default rep range. */
+export type Goal = 'strength' | 'muscle' | 'general';
+
+type Slot = 'heavy' | 'compound' | 'isolation' | 'bodyweight';
+
+const RANGES: Record<Goal, Record<Slot, [number, number]>> = {
+  strength: { heavy: [3, 5], compound: [5, 8], isolation: [8, 12], bodyweight: [5, 10] },
+  muscle: { heavy: [6, 10], compound: [8, 12], isolation: [10, 15], bodyweight: [8, 15] },
+  general: { heavy: [5, 8], compound: [8, 12], isolation: [10, 15], bodyweight: [6, 12] },
+};
+
+function slot(ex: Exercise): Slot {
+  if (ex.kind === 'reps') return 'bodyweight';
   if (ex.equipment === 'barbell' || ex.equipment === 'trap bar') {
-    return ISOLATION.has(ex.muscle) && ex.muscle !== 'shoulders' ? [8, 12] : [5, 8];
+    return ISOLATION.has(ex.muscle) && ex.muscle !== 'shoulders' ? 'compound' : 'heavy';
   }
-  if (ISOLATION.has(ex.muscle)) return [10, 15];
-  return [8, 12];
+  return ISOLATION.has(ex.muscle) ? 'isolation' : 'compound';
+}
+
+/** The rep range the coach works in: the exercise's own, or the goal's default. */
+export function repRange(ex: Exercise, goal: Goal = 'general'): [number, number] {
+  if (ex.repMin && ex.repMax && ex.repMax >= ex.repMin) return [ex.repMin, ex.repMax];
+  return RANGES[goal][slot(ex)];
 }
 
 export function incrementKg(ex: Exercise, unit: Unit): number {
@@ -51,6 +65,19 @@ export function incrementKg(ex: Exercise, unit: Unit): number {
 export function loadable(kg: number, unit: Unit): number {
   const step = unit === 'kg' ? 0.5 : 1;
   return fromDisplay(roundTo(toDisplay(kg, unit), step), unit);
+}
+
+/**
+ * Round onto a weight this exercise can actually be loaded to: whole plate
+ * jumps on a bar, the dumbbell rack's spacing for dumbbells. A suggestion of
+ * 63.5 kg on a barbell is one nobody can follow. `down` is for backing off —
+ * a deload or an off day should never round up.
+ */
+export function loadableFor(ex: Exercise, kg: number, unit: Unit, mode: 'nearest' | 'down' = 'nearest'): number {
+  const step = toDisplay(incrementKg(ex, unit), unit);
+  const v = toDisplay(kg, unit) / step;
+  const n = mode === 'down' ? Math.floor(v + 1e-9) : Math.round(v);
+  return fromDisplay(Math.round(n * step * 1000) / 1000, unit);
 }
 
 /** Sets that count for progression: completed, not warm-ups, not drop sets. */
@@ -111,13 +138,30 @@ export function stallCount(history: Session[]): number {
   return sinceBest;
 }
 
-export function suggest(ex: Exercise, history: Session[], unit: Unit): Suggestion {
-  const range = repRange(ex);
+export interface SuggestOptions {
+  goal?: Goal;
+  /** For a first session: a starting load estimated from a related lift. */
+  start?: { weightKg: number; reps: number; fromName: string; fromE1rmKg: number };
+}
+
+export function suggest(ex: Exercise, history: Session[], unit: Unit, opts: SuggestOptions = {}): Suggestion {
+  const range = repRange(ex, opts.goal);
   const [lo, hi] = range;
   const last = history[history.length - 1];
   const fmtW = (kg: number) => `${fmtNum(toDisplay(kg, unit), 1)} ${unit}`;
 
   if (!last) {
+    const start = opts.start;
+    if (start) {
+      return {
+        action: 'first',
+        sets: [{ weight: start.weightKg, reps: start.reps }],
+        headline: `Start around ${fmtW(start.weightKg)} × ${start.reps}`,
+        detail: `Estimated from your ${start.fromName} (about ${fmtW(start.fromE1rmKg)} for one rep), with two reps in reserve. Treat the first set as a calibration and adjust; the coach takes over next session.`,
+        stalled: 0,
+        range,
+      };
+    }
     return {
       action: 'first',
       sets: [],
@@ -180,7 +224,7 @@ export function suggest(ex: Exercise, history: Session[], unit: Unit): Suggestio
   }
 
   if (stalled >= 3) {
-    const deload = loadable(assisted ? w * 1.1 : w * 0.9, unit);
+    const deload = assisted ? loadableFor(ex, w * 1.1, unit) : loadableFor(ex, w * 0.9, unit, 'down');
     return {
       action: 'deload',
       sets: Array.from({ length: count }, () => ({ weight: deload, reps: hi })),

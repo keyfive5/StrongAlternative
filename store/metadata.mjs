@@ -3,60 +3,66 @@
 // Guideline 2.3.7 rejects price references outside the description, so the
 // name, subtitle, promotional text and keywords say nothing about cost. Other
 // apps are not named anywhere in the listing.
+//
+// v1.0.0 was rejected under 4.3(b) as indistinguishable from other workout
+// logs. The listing now leads with what the app does that a log does not:
+// it coaches, set by set, from the lifter's own history.
 
-export const NAME = 'Overload — Lift Tracker';
-export const SUBTITLE = 'Gym log & progressive overload';
+export const NAME = 'Overload: Strength Coach';
+export const SUBTITLE = 'Knows what to lift next';
 
 export const PROMOTIONAL_TEXT =
-  'Log sets in seconds, see exactly what to lift next time, and watch every lift trend up. Charts, records, plate maths and body stats, all on your phone.';
+  'A coach in your training log: a target for every set, an off-day adjustment after your first hard set, and a plain-English reason when a lift stalls.';
 
 export const KEYWORDS =
-  'workout,weightlifting,lifting,strength,1rm,routine,plates,bodybuilding,powerlifting,fitness,exercise';
+  'workout,weightlifting,gym,lifting,progressive overload,1rm,routine,plateau,powerlifting,tracker,log';
 
-export const DESCRIPTION = `Overload is a workout log built around one idea: lift a little more than last time.
+export const DESCRIPTION = `Overload is a strength coach built into a training log. It reads what you actually lifted and tells you what to do next — this set, this session, and when progress stops.
 
-Every exercise tells you what to aim for today, based on what you actually did last time. Hit the top of your rep range on every set and it tells you to add weight. Stall for three sessions and it tells you to deload, and by how much. You never have to scroll back through old workouts to work out what to put on the bar.
+A TARGET FOR EVERY SET
 
-LOGGING THAT KEEPS UP WITH YOU
+Every exercise opens with today's target, worked out from your last session and your rep range. Hit the top of the range on every set and it adds the smallest sensible weight; fall short and it holds you there until you do. Tap the tick to accept a target, or type what you actually did.
+
+IT READS THE DAY YOU ARE HAVING
+
+After your first hard set, Overload compares it with your recent sessions. On an off day — bad sleep, a long week — it tells you exactly how much to take off the remaining sets so you still get good work in. On a strong day it tells you what to try next. One tap applies it.
+
+IT EXPLAINS A PLATEAU
+
+When a lift stops moving, Overload does more than say "deload". It looks at your log: how many hard sets that muscle gets each week against your target, how often you train the lift, how many working sets you do, and whether your rep range has run its course. Then it lists what to change, most useful first, and names a close variation to rotate to.
+
+IT KNOWS WHERE TO START
+
+First time on a new lift? Instead of guessing, Overload estimates a starting weight from a lift you already do — your incline press from your bench, your Romanian deadlift from your deadlift — with reps in reserve, so the first session is a calibration, not a test.
+
+SET UP FOR YOUR GOAL
+
+Choose strength, muscle or a bit of both, and every rep range follows. Set your own range or load step for any exercise.
+
+EVERYTHING ELSE A LIFTER NEEDS
 
 • Last session's numbers next to every set
-• Today's target pre-filled: one tap on the tick accepts it
-• Rest timer starts by itself when you finish a set, with a buzz when it's up
-• Warm-up, drop and failure sets
-• Supersets, notes, RPE
-• One-tap warm-up ramp to your first working set
-• Plate calculator that only uses the plates you own
-• Records announced the moment you set them, not after you finish
+• Rest timer that starts itself, with an alert on the lock screen
+• Warm-up, drop and failure sets, supersets, RPE and notes
+• Plate calculator that uses only the plates you own, and a warm-up ramp
+• Charts of estimated one-rep max, heaviest weight, volume and reps
+• Records announced the moment you set them, and rep maxes from 1 to 15
+• Hard sets per muscle each week, and body measurements with charts
+• Unlimited routines, plus Push / Pull / Legs, Upper / Lower, 5×5 and Full Body
 
-EVERY CHART, NO LOCKS
+TRY IT BEFORE YOU LOG A THING
 
-• Estimated one-rep max over time, with your monthly trend
-• Heaviest weight, session volume and total reps for every exercise
-• Rep maxes from 1 to 15
-• What you could lift today for 1 to 12 reps
-• Weekly workouts, volume, sets and time
-• Hard sets per muscle each week against a target you choose
-• Body weight, body fat and nine body measurements with charts
-• A training calendar and your weekly streak
-
-ROUTINES AND PROGRAMMES
-
-• As many routines as you like
-• Start any past workout again in one tap, or save it as a routine
-• Push / Pull / Legs, Upper / Lower, 5×5 and Full Body ready to go
-• The app suggests which routine is next in your rotation
+On first launch you can explore six months of sample training, so you can watch the coach work straight away. Clear it with one tap when you are ready.
 
 YOUR HISTORY COMES WITH YOU
 
-• Import the CSV export from other popular lifting apps, including set types, RPE and notes. Re-importing the same file never creates duplicates
-• Export everything as a CSV that opens in any spreadsheet
-• Full backups in a single file
+Import the CSV export from other lifting apps, including set types, RPE and notes, and the coach works on your whole history at once. Export everything as CSV, or back up to a single file.
 
 PRIVATE BY DESIGN
 
-No account. No sign-up. No ads. No tracking. Your workouts are stored on your phone and never leave it unless you export them.
+No account. No ads. No tracking. Your training stays on your phone.
 
-Overload is free, and every feature is included. There is no subscription and no paid tier holding charts, routines or measurements back.`;
+Overload is free, with every feature included. No subscription.`;
 
 export const SUPPORT_URL = 'https://github.com/keyfive5/StrongAlternative';
 export const MARKETING_URL = 'https://github.com/keyfive5/StrongAlternative';
@@ -67,9 +73,9 @@ export const PRIMARY_CATEGORY = 'HEALTH_AND_FITNESS';
 export const SECONDARY_CATEGORY = 'SPORTS';
 
 export const SHOT_CAPTIONS = [
-  'Know exactly what to lift next',
-  'Records the moment you set them',
-  'Every chart. Nothing locked.',
-  'Coaching that spots stalls',
-  'Bring your whole history with you',
+  'A coach in your training log',
+  'A target for every set',
+  'Reads the day you are having',
+  'Explains a plateau',
+  'Knows where to start',
 ];

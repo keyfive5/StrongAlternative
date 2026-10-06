@@ -11,7 +11,7 @@ export type Route =
   | { name: 'workout'; id: string }
   | { name: 'editWorkout'; id: string }
   | { name: 'routine'; id?: string; fromWorkout?: string }
-  | { name: 'settings' }
+  | { name: 'settings'; autoImport?: boolean }
   | { name: 'measure'; kind: MeasureKind }
   | { name: 'summary'; id: string }
   | { name: 'plates' };

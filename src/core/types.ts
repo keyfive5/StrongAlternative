@@ -77,6 +77,8 @@ export interface Workout {
   exercises: WorkoutExercise[];
   notes?: string;
   routineId?: string;
+  /** Part of the explore-with-sample-data history; removable in one tap. */
+  sample?: boolean;
 }
 
 export interface RoutineSet {
@@ -102,6 +104,7 @@ export interface Routine {
   notes?: string;
   folder?: string;
   updated: number;
+  sample?: boolean;
 }
 
 export type MeasureKind =
@@ -114,6 +117,7 @@ export interface Measurement {
   at: number;
   /** kg for bodyweight, % for bodyfat, cm for everything else. */
   value: number;
+  sample?: boolean;
 }
 
 export interface Settings {
@@ -133,6 +137,10 @@ export interface Settings {
   weeklySetTarget: number;
   haptics: boolean;
   keepAwake: boolean;
+  /** Moves every default rep range: strength 3–5 on the big lifts, muscle 6–10. */
+  goal: 'strength' | 'muscle' | 'general';
+  /** The first-launch walkthrough has been seen. */
+  onboarded: boolean;
 }
 
 export interface Database {
@@ -163,6 +171,8 @@ export const DEFAULT_SETTINGS: Settings = {
   weeklySetTarget: 10,
   haptics: true,
   keepAwake: true,
+  goal: 'general',
+  onboarded: false,
 };
 
 export const LB_PLATES = [

@@ -6,7 +6,7 @@ import { api, appId, sleep } from './asc-lib.mjs';
 
 const APP = appId();
 const TARGET_VERSION = '1.0.0';
-const TARGET_BUILD = '1';
+const TARGET_BUILD = '2';
 
 const REVIEW_NOTES = `Overload is a weightlifting log that runs entirely on the device.
 

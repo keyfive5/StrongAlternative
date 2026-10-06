@@ -37,57 +37,72 @@ const seed = `(async () => {
   localStorage.removeItem('overload.active');
 })()`;
 
+const clearAll = `(() => {
+  Object.keys(localStorage).filter((k) => k.startsWith('overload.')).forEach((k) => localStorage.removeItem(k));
+})()`;
+
 const tid = (id) => `[data-testid="${id}"]`;
 
 const SHOTS = [
   {
     id: '1',
-    headline: ['Know exactly what', 'to lift next'],
+    headline: ['A coach in your', 'training log'],
+    // A fresh install: the first-launch walkthrough.
+    fresh: true,
     async run(page) {
-      await click(page, tid('tab-train'));
-      await click(page, tid('routine-Push'));
-      await click(page, tid('check-0-0'));
-      await settle(page, 1500);
+      await settle(page, 800);
     },
   },
   {
     id: '2',
-    headline: ['Records the moment', 'you set them'],
+    headline: ['A target for', 'every set'],
     async run(page) {
       await click(page, tid('tab-train'));
       await click(page, tid('routine-Push'));
       await click(page, tid('check-0-0'));
-      await type(page, tid('in-a-0-1'), '85');
-      await type(page, tid('in-b-0-1'), '5');
-      await click(page, tid('check-0-1'), 300);
+      await settle(page, 1200);
     },
   },
   {
     id: '3',
-    headline: ['Every chart.', 'Nothing locked.'],
+    headline: ['Reads the day', "you're having"],
     async run(page) {
-      await click(page, tid('tab-exercises'));
-      await type(page, tid('exercise-search'), 'squat barbell');
-      await click(page, tid('ex-squat-barbell'), 1200);
+      await click(page, tid('tab-train'));
+      await click(page, tid('routine-Push'));
+      // A first set well under this lifter's usual: the off-day coach.
+      await type(page, tid('in-a-0-0'), '80');
+      await type(page, tid('in-b-0-0'), '2');
+      await click(page, tid('check-0-0'), 900);
+      await page.waitForSelector(tid('readiness-0'), { timeout: 5000 });
+      await click(page, tid('rest-skip'), 600).catch(() => {});
     },
   },
   {
     id: '4',
-    headline: ['Spots a stall', 'before you do'],
+    headline: ['Explains', 'a plateau'],
     async run(page) {
-      await page.evaluate(() => {
-        // Scroll the Today screen down to the overload board.
-        const el = [...document.querySelectorAll('div')].find((d) => d.scrollHeight > d.clientHeight + 200 && getComputedStyle(d).overflowY !== 'visible');
-        if (el) el.scrollTop = 470;
-      });
-      await settle(page, 600);
+      await click(page, tid('tab-exercises'));
+      await type(page, tid('exercise-search'), 'overhead press barbell');
+      await click(page, tid('ex-overhead-press-barbell'), 1200);
+      await page.waitForSelector(tid('diagnosis'), { timeout: 5000 });
     },
   },
   {
     id: '5',
-    headline: ['Every muscle,', 'every week'],
+    headline: ['Knows where', 'to start'],
     async run(page) {
-      await click(page, tid('tab-progress'), 1000);
+      await click(page, tid('tab-train'));
+      await click(page, tid('routine-Push'));
+      await click(page, tid('add-exercises'), 900);
+      await type(page, tid('exercise-search'), 'incline bench barbell');
+      await click(page, tid('ex-incline-bench-press-barbell'));
+      await click(page, tid('picker-add'), 1200);
+      // Bring the new exercise, at the bottom of the workout, into view.
+      await page.evaluate(() => {
+        const el = document.querySelector('[data-testid="block-5"]');
+        el?.scrollIntoView({ block: 'center' });
+      });
+      await settle(page, 700);
     },
   },
 ];
@@ -160,9 +175,9 @@ try {
     for (const shot of SHOTS) {
       // Reseed before every shot so each one starts from the same library.
       await page.goto(BASE, { waitUntil: 'domcontentloaded' });
-      await page.evaluate(seed);
+      await page.evaluate(shot.fresh ? clearAll : seed);
       await page.goto(BASE, { waitUntil: 'networkidle0' });
-      await page.waitForSelector(tid('tab-today'), { timeout: 30000 });
+      await page.waitForSelector(tid(shot.fresh ? 'welcome' : 'tab-today'), { timeout: 30000 });
       await page.evaluate(() => {
         // Chrome paints a focus ring iOS never draws.
         const style = document.createElement('style');
