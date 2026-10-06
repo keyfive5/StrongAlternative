@@ -1,0 +1,28 @@
+Thank you for the review of 1.0.0. We took the 4.3 feedback seriously: on a fresh install the coach had no history to work from, so the app looked like any other log. This build changes what the app does, not just how it looks.
+
+WHAT IS NEW
+- Readiness: after the first hard set, the app compares it with the lifter's last three sessions. On an off day it sizes the remaining sets to today's strength; on a strong day it suggests more. One tap applies it.
+- Plateau diagnosis: when a lift stalls, the app reads the log (weekly sets for that muscle against the user's target, how often the lift is trained, working-set count, rep range) and lists what to change, plus a variation of the same movement to rotate to.
+- Starting estimates: a lift never done before gets a starting weight estimated from the user's strength on a related lift.
+- A training goal (strength / muscle / both) that sets every default rep range.
+- A first-launch walkthrough with "Explore with sample data".
+
+HOW TO SEE IT IN 30 SECONDS
+1. On first launch tap Continue twice, then "Explore with sample data" (six months of example training, removable in one tap).
+2. Train tab > Push. Each exercise shows today's target. Type 80 kg and 2 reps in the first bench set and tick it: the off-day coach appears with a "Use" button.
+3. Exercises tab > Overhead Press (Barbell): "Why it has stalled".
+4. In a workout, Add exercises > Incline Bench Press (Barbell): "Start around 62.5 kg", estimated from the bench press.
+No account, no purchase. The app makes no network requests.
+
+ANSWERS TO YOUR QUESTIONS
+1. It tells a lifter what weight and reps to do on every set, from their own history, and adjusts for off days and stalls. The problem: most lifters guess loads, stall without knowing why, and lose track of what they did last time.
+2. People who lift weights on a structured plan, beginner to intermediate, who want progress without paying a coach. The developer is one: he logged his training in another app and wanted progression guidance that is not behind a subscription.
+3. Existing logs record what you did. Overload prescribes what to do next: live off-day adjustment, a plateau diagnosis from the user's own log, and starting estimates across related lifts, free and fully on-device. It also imports history from other apps so the coach works from day one.
+4. There was no external beta for 1.0.0. Testing was internal: 338 automated tests covering the coaching logic, one-rep-max maths, records, plate maths, CSV import from other apps' export formats, and crash-safe saving; plus walking every screen with six months of simulated training. Internal review before submission found and fixed an on-device save race and forms hidden by the keyboard. We would welcome a TestFlight-based review if helpful.
+5. Standalone. The account's other apps are unrelated utilities (notes, QR codes, currency, timers, dice/coin).
+6. No. No other app on the account logs training or coaches lifting. The closest, Boxing Rounds, is a round timer with no history or logging.
+7. No shared frameworks. Two small utilities (an SVG icon component and a file-storage adapter) follow patterns from the same developer's earlier app; all training, coaching and import logic is unique to this app. Build and upload scripts are shared but are not in the binary.
+8. No. Only standard open-source frameworks (React Native, Expo, react-native-svg).
+9. No. It is the developer's own product and concept, not made for a client, not from a template or app-generation service.
+
+Contact: hzafar300@gmail.com

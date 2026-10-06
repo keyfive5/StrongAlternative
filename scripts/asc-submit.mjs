@@ -2,39 +2,15 @@
 // for review.
 //
 // Usage: node scripts/asc-submit.mjs
+import fs from 'fs';
 import { api, appId, sleep } from './asc-lib.mjs';
 
 const APP = appId();
 const TARGET_VERSION = '1.0.0';
 const TARGET_BUILD = '2';
 
-const REVIEW_NOTES = `Overload is a weightlifting log that runs entirely on the device.
-
-No account or login is needed. The app opens straight onto the Today screen
-and is fully usable the moment it launches.
-
-There is nothing to purchase. No subscription, no paid tier, no advertising.
-
-The app makes no network requests of any kind. There is no server, no sync,
-no analytics and no third-party SDK that transmits data. Workouts are stored
-as a JSON file inside the app's own Documents directory.
-
-No special permissions are requested. Import and export use the standard iOS
-document picker and share sheet, and only when the user taps them in Settings.
-
-Suggested walkthrough:
-1. On the Train tab, tap "Browse programmes" and add "Push / Pull / Legs".
-2. Tap the Push routine to start it. Type a weight and reps into the first
-   set, or just tap the tick to accept the suggested numbers. The rest timer
-   starts automatically.
-3. Tick a few more sets, then tap Finish. The summary shows volume, time
-   and any personal records.
-4. Start Push again: the "Previous" column now shows the last session, and
-   each exercise shows the coach's target for this session.
-5. The Exercises tab shows charts, records and history for any exercise.
-
-Contact: hzafar300@gmail.com
-`;
+// Kept in store/review-notes.txt so it can be read and edited as plain text.
+const REVIEW_NOTES = fs.readFileSync(new URL('../store/review-notes.txt', import.meta.url), 'utf8').trim();
 
 async function editableVersion() {
   const versions = await api('GET', `/v1/apps/${APP}/appStoreVersions?limit=10`);
@@ -214,16 +190,26 @@ async function fileForReview(versionId) {
     (i) => i.relationships?.appStoreVersion?.data?.id === versionId,
   );
   if (!alreadyIncluded) {
-    await api('POST', '/v1/reviewSubmissionItems', {
-      data: {
-        type: 'reviewSubmissionItems',
-        relationships: {
-          reviewSubmission: { data: { type: 'reviewSubmissions', id: submission.id } },
-          appStoreVersion: { data: { type: 'appStoreVersions', id: versionId } },
+    try {
+      await api('POST', '/v1/reviewSubmissionItems', {
+        data: {
+          type: 'reviewSubmissionItems',
+          relationships: {
+            reviewSubmission: { data: { type: 'reviewSubmissions', id: submission.id } },
+            appStoreVersion: { data: { type: 'appStoreVersions', id: versionId } },
+          },
         },
-      },
-    });
-    console.log('• version added to the submission');
+      });
+      console.log('• version added to the submission');
+    } catch (e) {
+      // A rejected submission (UNRESOLVED_ISSUES) still holds its version as an
+      // item, which the items listing does not always show; resubmitting it is
+      // just the PATCH below. Anything else is a real blocker.
+      const text = JSON.stringify(e.json ?? {});
+      if (submission.attributes.state === 'UNRESOLVED_ISSUES' && e.status === 409 && !/associatedErrors/.test(text)) {
+        console.log('• version already in the rejected submission; resubmitting it');
+      } else throw e;
+    }
   }
 
   const final = await api('PATCH', `/v1/reviewSubmissions/${submission.id}`, {

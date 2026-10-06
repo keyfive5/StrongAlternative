@@ -8,7 +8,7 @@
 // logs. The listing now leads with what the app does that a log does not:
 // it coaches, set by set, from the lifter's own history.
 
-export const NAME = 'Overload: Strength Coach';
+export const NAME = 'Overload — Strength Coach';
 export const SUBTITLE = 'Knows what to lift next';
 
 export const PROMOTIONAL_TEXT =
