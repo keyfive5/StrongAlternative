@@ -187,13 +187,25 @@ node scripts/asc-submit.mjs
   It is not in the public API: App Information → Regulated Medical Devices →
   Declare → No → Save. Re-running `asc-submit.mjs` then reuses the open
   submission.
+- **Resubmitting a rejected version is a two-click web step.** After a new
+  build is attached, `PATCH /v1/reviewSubmissions/{id} {submitted:true}` on the
+  UNRESOLVED_ISSUES submission 409s with "Version is not ready to be submitted
+  yet", and the web "Resubmit to App Review" button stays greyed out, until
+  **Update Review** is clicked on the version page. That moves the item to
+  Ready for Review; then Resubmit works. `asc-submit.mjs` gets everything else
+  ready (build, notes, rights, price) — finish in the browser.
+- **4.3 spam rejections** (Oct 2026): a fresh install must show what makes the
+  app different. The coach had no history to work from, so the reviewer saw a
+  plain log. The fix was real features plus a first-launch "explore with sample
+  data" path and review notes that walk the reviewer to them in 30 seconds
+  (`store/review-notes.txt`, which also answers Apple's nine 4.3 questions).
 - The App Store Connect New App dialog: text fields take real clicks and
   typing; the two dropdowns need click, type the option text, then Return.
   Setting their value programmatically is ignored.
 
 ## This app
 
-- App Store Connect id **6818696263** (also in `.ascappid`) — submitted for review 2 Oct 2026, release after approval
+- App Store Connect id **6818696263** (also in `.ascappid`) — rejected 4.3 on 5 Oct 2026; build 2 (coach features) resubmitted 10 Oct 2026
 - Bundle `com.hasanzafar.overload` (bundle id record 5TTGQ6J48P), SKU `OVERLOAD2026`
 - EAS project `2e944a56-169c-4a78-8d75-638dc90cac87`
 - Distribution certificate DNL88X8YD9, provisioning profile GPU763T4X9

@@ -1,6 +1,12 @@
 // Attaches the processed build to the editable App Store version and files it
 // for review.
 //
+// Resubmitting after a rejection: this attaches the build and sets the notes,
+// but Apple only accepts the resubmission once "Update Review" has been
+// clicked on the version page in App Store Connect; until then the final
+// PATCH 409s with "Version is not ready to be submitted yet". Click Update
+// Review, then "Resubmit to App Review" on the submission page.
+//
 // Usage: node scripts/asc-submit.mjs
 import fs from 'fs';
 import { api, appId, sleep } from './asc-lib.mjs';
